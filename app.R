@@ -32,8 +32,11 @@ ui <- shinyUI(fluidPage(
                                       c(None='',
                                         'Double Quote'='"',
                                         'Single Quote'="'"),
-                                      '"')
-                         
+                                      '"'),
+                         # Input boxes for graph labels and title
+                         textInput("XVar", "X-Variable Label", value = "X", width = "400px", placeholder = "Enter a label for the X Axis"),
+                         textInput("YVar", "Y-Variable Label", value = "Y", width = "400px", placeholder = "Enter a label for the Y Axis"),
+                         textInput("pTitle", "Plot Title", value = "My Scatterplot", width = "400px", placeholder = "Enter a descriptive title")
                      ),
                      mainPanel(
                          tableOutput('contents')
@@ -42,9 +45,9 @@ ui <- shinyUI(fluidPage(
         ),
       
         
-        tabPanel("First Type",
+        tabPanel("Output",
                  pageWithSidebar(
-                     headerPanel('My First Plot'),
+                     headerPanel('Analysis Output'),
                      sidebarPanel(
                          
                          # "Empty inputs" - they will be updated after the data is uploaded
@@ -64,24 +67,17 @@ ui <- shinyUI(fluidPage(
 )
 
 server <- shinyServer(function(input, output, session) {
-    # added "session" because updateSelectInput requires it
+
     
-    
-    data <- reactive({ 
-        req(input$file1) ## ?req #  require that the input is available
+data <- reactive({ 
+        req(input$file1)
         
         inFile <- input$file1 
         
-        # tested with a following dataset: write.csv(mtcars, "mtcars.csv")
-        # and                              write.csv(iris, "iris.csv")
         df <- read.csv(inFile$datapath, header = input$header, sep = input$sep,
                        quote = input$quote)
         
         
-        # Update inputs (you could create an observer with both updateSel...)
-        # You can also constraint your choices. If you wanted select only numeric
-        # variables you could set "choices = sapply(df, is.numeric)"
-        # It depends on what do you want to do later on.
         
         updateSelectInput(session, inputId = 'xcol', label = 'X Variable',
                           choices = names(df), selected = names(df))
@@ -95,12 +91,14 @@ server <- shinyServer(function(input, output, session) {
         data()
     })
     
+    output$valueX <- renderText({ input$XVar })
+    
     output$MyPlot <- renderPlot({
         x <- data()[, (input$xcol)]
         y <- data()[, (input$ycol)]
-        df <- data.frame(x = x,
+        df2 <- data.frame(x = x,
                          y = y)
-        ggplot(df) +
+        ggplot(df2) +
         aes(x = x, y = y) +
             geom_point(size = 3, alpha = .8) +
             geom_smooth(method = "lm", aes(linetype = "dotted"), alpha = 0.1) +
@@ -109,14 +107,18 @@ server <- shinyServer(function(input, output, session) {
                   axis.text.y = element_text(size = 14),
                   axis.title = element_text(size = 16, lineheight = 2),
                   plot.title = element_text(size = 14, lineheight = 2, face="bold"),
-                  strip.text.x = element_text(size = 14))
+                  strip.text.x = element_text(size = 14)) +
+          xlab(req(input$XVar)) +
+          ylab(req(input$YVar)) +
+          ggtitle(req(input$pTitle))
+        
     })
     
     output$StatSum <- renderPrint({
         x <- data()[, c(input$xcol, input$ycol)]
         round(stat.desc(
             x,
-            basic = FALSE,
+            basic = TRUE,
             norm = TRUE
         ), digits = 3)
     })
