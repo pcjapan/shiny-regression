@@ -8,9 +8,6 @@ library(pastecs)
 library(ggplot2)
 library(ggpmisc)
 
-
-
-
 ui <- shinyUI(fluidPage(
   
   tags$head(
@@ -34,11 +31,16 @@ ui <- shinyUI(fluidPage(
       border-bottom: 2px solid;
       }
       
+      h3.side {
+      font-style: italic;
+      border-bottom: none;
+      }
+      
       pre#StatSum { width: 400px; }
 			
-      pre#Regress { width: 600px; }
+      pre#Regress, pre#RegressCI { width: 600px; }
       
-      .instructText { 
+      .instructText, #text1 { 
       font-style: italic;
       line-height:2;
       margin-bottom: 6pt;
@@ -100,6 +102,7 @@ ui <- shinyUI(fluidPage(
       pageWithSidebar(
         headerPanel('Analysis Output'),
         sidebarPanel(
+          tags$h3("Plotting Options", class = "side"),
           p("Select the x and y values from your data.", class = "instructText"),
           # "Empty inputs" - they will be updated after the data is uploaded
           selectInput('xcol', 'X Variable', "", width = "400px"),
@@ -133,6 +136,8 @@ ui <- shinyUI(fluidPage(
           tags$br(),
           tags$h3("Regression Analysis"),
           verbatimTextOutput("Regress"),
+          uiOutput("text1"),
+          verbatimTextOutput("RegressCI"),
           tags$br(),
           tags$h3("Scatterplot"),
           plotOutput('MyPlot')
@@ -178,19 +183,23 @@ server <- shinyServer(function(input, output, session) {
     
     return(df)
   })
-
+  
   output$contents <- renderTable({
     data()
   })
-  
-# Plot
+
+  # Globals
+
+  x <- reactive(data()[, (input$xcol)])
+  y <- reactive(data()[, (input$ycol)])
+  regressionData <- reactive(data.frame(x = x(),
+                   y = y()))
+  rg <- reactive(lm(y ~ x, regressionData()))
+
+  # Plot
 
   output$MyPlot <- renderPlot({
-    x <- data()[, (input$xcol)]
-    y <- data()[, (input$ycol)]
-    df2 <- data.frame(x = x,
-                      y = y)
-    p <- ggplot(df2) +
+    p <- ggplot(regressionData()) +
       aes(x = x, y = y) +
       geom_point(size = 3, alpha = .8) +
       geom_smooth(method = "lm", alpha = 0.1) +
@@ -208,10 +217,11 @@ server <- shinyServer(function(input, output, session) {
       xlab(req(input$XVar)) +
       ylab(req(input$YVar)) +
       ggtitle(req(input$pTitle)) +
-      scale_linetype_discrete(guide = "none") 
+      scale_linetype_discrete(guide = "none")
+# If annotation on plot
     {   if (input$plotAnnotate == 1)  { p <- p + stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., "with", ..rr.label.., "\n",  ..f.value.label.., "and", ..p.value.label.., sep = "~~~")), size = 6, parse = TRUE)}
-  
-  }
+      }
+# Else
       p  
   })
   
@@ -227,13 +237,19 @@ server <- shinyServer(function(input, output, session) {
 #  Regression
 
   output$Regress <- renderPrint({
-    x <- data()[, (input$xcol)]
-    y <- data()[, (input$ycol)]
-    df3 <- data.frame(x = x,
-                      y = y)
-    rg <- lm(y ~ x, df3)
-    summary(rg)
+    summary(rg())
   })
+
+# regression CI
+  
+output$RegressCI <- renderPrint({
+  confint(rg())
+})
+
+output$text1 <- renderUI(HTML(paste(
+  "Below are the 95% confidence intervals for the regression coefficents,", em("b")
+)))
+
 })
 
 shinyApp(ui, server)
