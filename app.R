@@ -207,7 +207,7 @@ server <- shinyServer(function(input, output, session) {
   y <- reactive(data()[, (input$ycol)])
   regressionData <- reactive(data.frame(x = x(),
                                         y = y()))
-  rg <- reactive(lm(y ~ x, regressionData()))
+  rg <- reactive(rlm(y ~ x, regressionData()))
   
   # Plot
   
