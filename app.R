@@ -36,7 +36,7 @@ ui <- shinyUI(fluidPage(
 
       pre#StatSum { width: 400px; }
 
-      pre#Regress, pre#RegressCI { width: 600px; }
+      pre#Regress, pre#RegressCI, pre#BsCI { width: 600px; }
 
       .instructText, #
 text1 {
@@ -151,7 +151,7 @@ tabsetPanel(
         verbatimTextOutput("Regress"),
         uiOutput("text1"),
         verbatimTextOutput("RegressCI"),
-        verbatimTextOutput("BsR2CI"),
+        verbatimTextOutput("BsCI"),
         tags$br(),
         tags$h3("Scatterplot"),
         plotOutput('MyPlot')
@@ -299,7 +299,7 @@ server <- shinyServer(function(input, output, session) {
   
   # Bootstrapping regression
   
-  output$BsR2CI <- renderPrint({
+  output$BsCI <- renderPrint({
     results <- boot(data=regressionData(), statistic=bs(), 
                     R=1000, formula=y ~ x)
     boot.ci(results, type="bca", index=2) # 1								
