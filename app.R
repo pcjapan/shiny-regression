@@ -7,6 +7,7 @@ library(shinyWidgets)
 library(pastecs)
 library(ggplot2)
 library(ggpmisc)
+library(boot)
 
 ui <- shinyUI(fluidPage(
   tags$head(
@@ -14,14 +15,13 @@ ui <- shinyUI(fluidPage(
     
     tags$style(
       "
-
       textarea {
         padding:10px;
         min-width: 20px; !important;
         position: relative;
       }
 
-      p { line-height: 1.5; }
+      p { line-height: 2; }
 
       h3 {
       line-height: 2;
@@ -151,6 +151,7 @@ tabsetPanel(
         verbatimTextOutput("Regress"),
         uiOutput("text1"),
         verbatimTextOutput("RegressCI"),
+        verbatimTextOutput("BsR2CI"),
         tags$br(),
         tags$h3("Scatterplot"),
         plotOutput('MyPlot')
@@ -202,12 +203,22 @@ server <- shinyServer(function(input, output, session) {
   })
   
   # Globals
-  
+
   x <- reactive(data()[, (input$xcol)])
   y <- reactive(data()[, (input$ycol)])
   regressionData <- reactive(data.frame(x = x(),
                                         y = y()))
   rg <- reactive(lm(y ~ x, regressionData()))
+  
+  BsReg <- reactive(boot(regressionData(),function(data,indices)
+    summary(lm(y ~ x,data[indices,]))$r.squared,R=1000))
+
+  bs <- reactive(function(formula, data, indices) {
+    d <- data[indices,] # allows boot to select sample 
+    fit <- lm(formula, data=d)
+    return(coef(fit))
+  } 
+  )
   
   # Plot
   
@@ -285,6 +296,14 @@ server <- shinyServer(function(input, output, session) {
       em("b")
     )
   ))
+  
+  # Bootstrapping regression
+  
+  output$BsR2CI <- renderPrint({
+    results <- boot(data=regressionData(), statistic=bs(), 
+                    R=1000, formula=y ~ x)
+    boot.ci(results, type="bca", index=2) # 1								
+  })
   
 })
 
