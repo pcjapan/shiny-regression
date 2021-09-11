@@ -36,10 +36,9 @@ ui <- shinyUI(fluidPage(
 
       pre#StatSum { width: 400px; }
 
-      pre#Regress, pre#RegressCI, pre#BsCI { width: 600px; }
+      pre#Regress, pre#BsCI { width: 600px; }
 
-      .instructText, #
-text1 {
+      .instructText, #text1 {
       font-style: italic;
       line-height:2;
       margin-bottom: 6pt;
@@ -107,6 +106,7 @@ tabsetPanel(
     )
   ),
   
+  ## Second tab with the output
   
   tabPanel(
     "Output",
@@ -150,7 +150,6 @@ tabsetPanel(
         tags$h3("Regression Analysis"),
         verbatimTextOutput("Regress"),
         uiOutput("text1"),
-        verbatimTextOutput("RegressCI"),
         verbatimTextOutput("BsCI"),
         tags$br(),
         tags$h3("Scatterplot"),
@@ -202,23 +201,28 @@ server <- shinyServer(function(input, output, session) {
     data()
   })
   
+  #--------------
+  
   # Globals
 
   x <- reactive(data()[, (input$xcol)])
   y <- reactive(data()[, (input$ycol)])
   regressionData <- reactive(data.frame(x = x(),
                                         y = y()))
+  
+  
   rg <- reactive(lm(y ~ x, regressionData()))
   
-  BsReg <- reactive(boot(regressionData(),function(data,indices)
-    summary(lm(y ~ x,data[indices,]))$r.squared,R=1000))
-
+  ## bootstrapped CIs for regression coefficient
+  
   bs <- reactive(function(formula, data, indices) {
-    d <- data[indices,] # allows boot to select sample 
+    d <- data[indices,]
     fit <- lm(formula, data=d)
     return(coef(fit))
   } 
   )
+  
+  #-------------
   
   # Plot
   
@@ -284,15 +288,10 @@ server <- shinyServer(function(input, output, session) {
     summary(rg())
   })
   
-  # regression CI
-  
-  output$RegressCI <- renderPrint({
-    confint(rg())
-  })
   
   output$text1 <- renderUI(HTML(
     paste(
-      "Below are the 95% confidence intervals for the regression coefficents,",
+      "Below are the bootstrapped 95% confidence intervals for the regression coefficents,",
       em("b")
     )
   ))
