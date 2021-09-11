@@ -141,8 +141,23 @@ tabsetPanel(
         awesomeRadio("plotAnnotate", "Annotation",
                      c(Yes = 1,
                        No = 0),
-                     status = "success")
+                     status = "success"),
+        p(
+          "Select the level of bootstrapping. 2,000 is recommended.",
+          class = "instructText"
+        ),
+        knobInput(
+          "btsn",
+          label = "Bootstrap Level",
+          value = 2000,
+          step = 1000,
+          min = 1000,
+          max = 5000
+        ),
       ),
+      
+      # This next section displays the results
+      
       mainPanel(
         tags$h3("Descriptive Statistics"),
         verbatimTextOutput("StatSum"),
@@ -222,6 +237,8 @@ server <- shinyServer(function(input, output, session) {
   } 
   )
   
+  btsn <- reactive(input$btsn)
+  
   #-------------
   
   # Plot
@@ -292,7 +309,7 @@ server <- shinyServer(function(input, output, session) {
   output$text1 <- renderUI(HTML(
     paste(
       "Below are the bootstrapped 95% confidence intervals for the regression coefficents,",
-      em("b")
+      em("b"), "Bootstrapping will take a little time depending on the size of both the bootstap & of your dataset."
     )
   ))
   
@@ -300,7 +317,7 @@ server <- shinyServer(function(input, output, session) {
   
   output$BsCI <- renderPrint({
     results <- boot(data=regressionData(), statistic=bs(), 
-                    R=1000, formula=y ~ x)
+                    R=btsn(), formula=y ~ x)
     boot.ci(results, type="bca", index=2) # 1								
   })
   
