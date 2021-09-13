@@ -8,6 +8,7 @@ library(pastecs)
 library(ggplot2)
 library(ggpmisc)
 library(boot)
+library(MASS)
 
 ui <- shinyUI(fluidPage(
   tags$head(
@@ -36,7 +37,7 @@ ui <- shinyUI(fluidPage(
 
       pre#StatSum { width: 400px; }
 
-      pre#Regress, pre#BsCI { width: 600px; }
+      pre#Regress, pre#RegressCI, pre#BsCI { width: 600px; }
 
       .instructText, #text1 {
       font-style: italic;
@@ -100,7 +101,7 @@ tabsetPanel(
           ),
           '"',
           status = "success"
-        )
+        ),
       ),
       mainPanel(tableOutput('contents'))
     )
@@ -135,25 +136,11 @@ tabsetPanel(
           placeholder = "Enter a descriptive title"
         ),
         p(
-          "Do you want to include the regression formula as an annotation on the plot?",
+          "Do you want to do a robust regression ?",
           class = "instructText"
         ),
-        awesomeRadio("plotAnnotate", "Annotation",
-                     c(Yes = 1,
-                       No = 0),
-                     status = "success"),
-        p(
-          "Select the level of bootstrapping. 2,000 is recommended.",
-          class = "instructText"
-        ),
-        knobInput(
-          "btsn",
-          label = "Bootstrap Level",
-          value = 2000,
-          step = 1000,
-          min = 1000,
-          max = 5000
-        ),
+        awesomeRadio("rReg", "Robust Regression", selected = 0, c(Yes = 1,No = 0),status = "success"),
+
       ),
       
       # This next section displays the results
@@ -163,9 +150,9 @@ tabsetPanel(
         verbatimTextOutput("StatSum"),
         tags$br(),
         tags$h3("Regression Analysis"),
+        verbatimTextOutput("ifbstp"),
         verbatimTextOutput("Regress"),
-        uiOutput("text1"),
-        verbatimTextOutput("BsCI"),
+        verbatimTextOutput("RegressCI"),
         tags$br(),
         tags$h3("Scatterplot"),
         plotOutput('MyPlot')
@@ -228,6 +215,8 @@ server <- shinyServer(function(input, output, session) {
   
   rg <- reactive(lm(y ~ x, regressionData()))
   
+  rrg <- reactive(rlm(y ~ x, regressionData()))
+  
   ## bootstrapped CIs for regression coefficient
   
   bs <- reactive(function(formula, data, indices) {
@@ -236,18 +225,15 @@ server <- shinyServer(function(input, output, session) {
     return(coef(fit))
   } 
   )
-  
-  btsn <- reactive(input$btsn)
-  
+  rReg <- reactive(input$rReg)
   #-------------
   
-  # Plot
+   # Plot
   
   output$MyPlot <- renderPlot({
     p <- ggplot(regressionData()) +
       aes(x = x, y = y) +
       geom_point(size = 3, alpha = .8) +
-      geom_smooth(method = "lm", alpha = 0.1) +
       theme_minimal() +
       theme(
         axis.text.x = element_text(size = 14),
@@ -263,30 +249,15 @@ server <- shinyServer(function(input, output, session) {
       ylab(req(input$YVar)) +
       ggtitle(req(input$pTitle)) +
       scale_linetype_discrete(guide = "none")
-    # If annotation on plot
+    # Change based on whether robust or otherwise
     {
-      if (input$plotAnnotate == 1)  {
+      if (input$rReg == 1)  {
         p <-
-          p + stat_poly_eq(
-            formula = y ~ x,
-            aes(
-              label = paste(
-                ..eq.label..,
-                "with",
-                ..rr.label..,
-                "\n",
-                ..f.value.label..,
-                "and",
-                ..p.value.label..,
-                sep = "~~~"
-              )
-            ),
-            size = 6,
-            parse = TRUE
-          )
+          p + geom_smooth(method = "rlm", alpha = 0.1)
       }
+      
+      else { p <- p + geom_smooth(method = "lm", alpha = 0.1)}
       }
-    # Else
     p
   })
   
@@ -299,27 +270,40 @@ server <- shinyServer(function(input, output, session) {
                     norm = TRUE), digits = 3)
   })
   
-  #  Regression
+
+  ifbstp <- reactive({
+    
+    if (rReg() == 0)  {
+      #  Regression
+      
+      output$Regress <- renderPrint({
+        summary(rg())
+      })
+      
+      # regression CI
+      
+      output$RegressCI <- renderPrint({
+        confint(rg())
+      })
+    }
+    
+   else if (rReg() == 1) {
+      
+     output$Regress <- renderPrint({
+       summary(rrg())
+     })
+   
+      
+# regression CI
+     
+     output$RegressCI <- renderPrint({
+       confint.default(rrg())
+     })
+   }
+
+  })  
   
-  output$Regress <- renderPrint({
-    summary(rg())
-  })
-  
-  
-  output$text1 <- renderUI(HTML(
-    paste(
-      "Below are the bootstrapped 95% confidence intervals for the regression coefficents,",
-      em("b"), "Bootstrapping will take a little time depending on the size of both the bootstap & of your dataset."
-    )
-  ))
-  
-  # Bootstrapping regression
-  
-  output$BsCI <- renderPrint({
-    results <- boot(data=regressionData(), statistic=bs(), 
-                    R=btsn(), formula=y ~ x)
-    boot.ci(results, type="bca", index=2) # 1								
-  })
+  output$ifbstp <- renderPrint({ifbstp()})
   
 })
 
