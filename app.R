@@ -4,7 +4,7 @@
 
 library(shiny)
 library(shinyWidgets)
-library(pastecs)
+library(psych)
 library(ggplot2)
 library(ggpmisc)
 library(boot)
@@ -35,7 +35,7 @@ ui <- shinyUI(fluidPage(
       border-bottom: none;
       }
 
-      pre#StatSum { width: 400px; }
+      pre#StatSum { width: 800px; }
 
       pre#Regress, pre#RegressCI, pre#BsCI { width: 600px; }
 
@@ -153,6 +153,9 @@ tabsetPanel(
         verbatimTextOutput("ifbstp"),
         verbatimTextOutput("Regress"),
         verbatimTextOutput("RegressCI"),
+        tags$h4("Residual Standard Error"),
+        tags$p("The residual standard error (RSE) is a way to measure the standard deviation of the residuals in a regression model. The lower the value for RSE, the more closely a model is able to fit the data. Compare the RSE for the robust regression model against the standard model. The lower RSE figure points to a better fit for that particular model."),
+        verbatimTextOutput("RegressRSE"),
         tags$br(),
         tags$h3("Scatterplot"),
         plotOutput('MyPlot')
@@ -253,21 +256,19 @@ server <- shinyServer(function(input, output, session) {
     {
       if (input$rReg == 1)  {
         p <-
-          p + geom_smooth(method = "rlm", alpha = 0.1)
+          p + geom_smooth(method = "rlm", alpha = 0.3, fill = "blue")
       }
       
-      else { p <- p + geom_smooth(method = "lm", alpha = 0.1)}
+      else { p <- p + geom_smooth(method = "lm", alpha = 0.3, fill = "blue")}
       }
     p
   })
   
-  # Descriptive statistics
+  # Descriptive statistics - using the psych describe function
   
   output$StatSum <- renderPrint({
     x <- data()[, c(input$xcol, input$ycol)]
-    round(stat.desc(x,
-                    basic = TRUE,
-                    norm = TRUE), digits = 3)
+    round(describe(x), digits = 3)
   })
   
 
@@ -285,6 +286,12 @@ server <- shinyServer(function(input, output, session) {
       output$RegressCI <- renderPrint({
         confint(rg())
       })
+      
+      # residual standard error (RSE) 
+      
+      output$RegressRSE <- renderPrint({
+        summary(rg())$sigma
+      })
     }
     
    else if (rReg() == 1) {
@@ -294,10 +301,16 @@ server <- shinyServer(function(input, output, session) {
      })
    
       
-# regression CI
+      # regression CI
      
      output$RegressCI <- renderPrint({
        confint.default(rrg())
+     })
+     
+     # residual standard error (RSE) 
+     
+     output$RegressRSE <- renderPrint({
+       summary(rrg())$sigma
      })
    }
 
