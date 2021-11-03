@@ -37,7 +37,13 @@ ui <- shinyUI(fluidPage(
 
       pre#StatSum { width: 800px; }
 
-      pre#Regress, pre#RegressCI, pre#BsCI { width: 600px; }
+      pre#Regress, pre#RegressCI, pre#BsCI, pre#RegressRSET, pre#RegressRSE { width: 600px; }
+      
+      pre#RegressRSET { 
+      background: none; 
+      border: none;
+      font-weight: bold;
+      }
 
       .instructText, #text1 {
       font-style: italic;
@@ -145,21 +151,39 @@ tabsetPanel(
       
       # This next section displays the results
       
-      mainPanel(
+      mainPanel(tabsetPanel(
+        tabPanel(
+        "Regression Results",
         tags$h3("Descriptive Statistics"),
         verbatimTextOutput("StatSum"),
         tags$br(),
         tags$h3("Regression Analysis"),
         verbatimTextOutput("ifbstp"),
         verbatimTextOutput("Regress"),
+        tags$h4("95% Confidence Intervals for the intercept"),
         verbatimTextOutput("RegressCI"),
-        tags$h4("Residual Standard Error"),
-        tags$p("The residual standard error (RSE) is a way to measure the standard deviation of the residuals in a regression model. The lower the value for RSE, the more closely a model is able to fit the data. Compare the RSE for the robust regression model against the standard model. The lower RSE figure points to a better fit for that particular model."),
-        verbatimTextOutput("RegressRSE"),
         tags$br(),
         tags$h3("Scatterplot"),
         plotOutput('MyPlot')
-        
+      ),
+      tabPanel(
+        "Residuals",
+        tags$h3("Residual Standard Error"),
+        tags$p("The residual standard error (RSE) is a way to measure the standard deviation of the residuals in a regression model. Use this to help decide which regresion model to report."),
+        tags$ul(tags$li("The lower the value for RSE, the more closely a model is able to fit the data."),
+                tags$li("Compare the RSE for the robust regression model against the standard model. The lower of the two points to a better fit for that particular model."),
+        ),
+        verbatimTextOutput("RegressRSET"),
+        verbatimTextOutput("RegressRSE"),
+        tags$h3("Graph of Standardized Residuals"),
+        tags$p("Standardized residuals with an absolute value greater than 3 should be considered as outliers.",
+        tags$br(),
+        "These may result in errors in the analysis if using a stahdard (OLS) regression.",
+        tags$br(),
+        "If they present, a robust regression will likely give better results."),
+        plotOutput('stdrPlot'),
+      )
+      )
       )
     )
   )
@@ -216,7 +240,7 @@ server <- shinyServer(function(input, output, session) {
                                         y = y()))
   
   
-  rg <- reactive(lm(y ~ x, regressionData()))
+  rg <- reactive(lm(y ~ x, regressionData(), na.action=na.exclude))
   
   rrg <- reactive(rlm(y ~ x, regressionData()))
   
@@ -271,6 +295,17 @@ server <- shinyServer(function(input, output, session) {
     round(describe(x), digits = 3)
   })
   
+  #plot standardized residuals
+  
+ output$stdrPlot <- renderPlot({
+   
+   rg.stdres =  rstandard(rg())
+   plot(y(), rg.stdres, 
+       ylab="", 
+       xlab="", 
+       main="") 
+  abline(0, 0)})
+  
 
   ifbstp <- reactive({
     
@@ -289,8 +324,12 @@ server <- shinyServer(function(input, output, session) {
       
       # residual standard error (RSE) 
       
-      output$RegressRSE <- renderPrint({
-        summary(rg())$sigma
+      output$RegressRSE <- renderText({
+       summary(rg())$sigma
+      })
+      
+      output$RegressRSET <- renderText({
+        "This is the RSE for the standard regression (OLS) model"
       })
     }
     
@@ -311,6 +350,10 @@ server <- shinyServer(function(input, output, session) {
      
      output$RegressRSE <- renderPrint({
        summary(rrg())$sigma
+     })
+     
+     output$RegressRSET <- renderText({
+       "This is the RSE for the robust regression model"
      })
    }
 
