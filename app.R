@@ -162,6 +162,8 @@ ui <- shinyUI(fluidPage(
             tags$br(),
             tags$h3("Scatterplot"),
             plotOutput('MyPlot'),
+            downloadButton(outputId = "downloadPlotRegP",
+                           label = "Download This Plot"),
             tags$h3("Regression Analysis"),
             verbatimTextOutput("ifbstp"),
             verbatimTextOutput("Regress"),
@@ -259,40 +261,57 @@ server <- shinyServer(function(input, output, session) {
   } 
   )
   rReg <- reactive(input$rReg)
+  
+  ## regression Plot
+  
+  p <- reactive(ggplot(regressionData()) +
+    aes(x = x, y = y) +
+    geom_point(size = 3, alpha = .8) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size = 14),
+      axis.text.y = element_text(size = 14),
+      axis.title = element_text(size = 16, lineheight = 2),
+      plot.title = element_text(
+        size = 16,
+        lineheight = 2,
+        face = "bold"
+      )
+    )  +
+    xlab(req(input$XVar)) +
+    ylab(req(input$YVar)) +
+    ggtitle(req(input$pTitle)) +
+    scale_linetype_discrete(guide = "none"))
+  
   #-------------
   
   # Plot
   
   output$MyPlot <- renderPlot({
-    p <- ggplot(regressionData()) +
-      aes(x = x, y = y) +
-      geom_point(size = 3, alpha = .8) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(size = 14),
-        axis.text.y = element_text(size = 14),
-        axis.title = element_text(size = 16, lineheight = 2),
-        plot.title = element_text(
-          size = 16,
-          lineheight = 2,
-          face = "bold"
-        )
-      )  +
-      xlab(req(input$XVar)) +
-      ylab(req(input$YVar)) +
-      ggtitle(req(input$pTitle)) +
-      scale_linetype_discrete(guide = "none")
+    
     # Change based on whether robust or otherwise
-    {
+    
       if (input$rReg == 1)  {
-        p <-
-          p + geom_smooth(method = "rlm", alpha = 0.3, fill = "blue")
+        p <- p() + geom_smooth(method = "rlm", alpha = 0.3, fill = "blue")
       }
       
-      else { p <- p + geom_smooth(method = "lm", alpha = 0.3, fill = "blue")}
-      }
+      else { p <- p() + geom_smooth(method = "lm", alpha = 0.3, fill = "blue")}
+      
     p
   })
+  
+  ## Download Plots
+  output$downloadPlotRegP <- downloadHandler(
+    filename = "regression-plot.pdf",
+    content = function(file) { 
+      if (input$rReg == 1)  {
+        ggsave(file, plot = (p() + geom_smooth(method = "rlm", alpha = 0.3, fill = "blue")), device = "pdf", width = 10, height = 6, scale = 1)
+      }
+      else {
+        ggsave(file, plot = (p() + geom_smooth(method = "lm", alpha = 0.3, fill = "blue")), device = "pdf", width = 10, height = 6, scale = 1)
+      }
+    }
+  )
   
   # Descriptive statistics - using the psych describe function
   
