@@ -10,7 +10,7 @@ library(ggplot2)
 library(ggpmisc)
 library(boot)
 library(MASS)
-# library(psychometric)
+library(psychometric)
 library(fBasics)
 library(lmtest)
 
