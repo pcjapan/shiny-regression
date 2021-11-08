@@ -4,12 +4,38 @@
 
 library(shiny)
 library(shinyWidgets)
+library(dplyr)
 library(psych)
 library(ggplot2)
 library(ggpmisc)
 library(boot)
 library(MASS)
-library(psychometric)
+# library(psychometric)
+library(fBasics)
+library(lmtest)
+
+# Functions
+
+residTest  <- function(modelName, dataset) {
+  attach(dataset)
+  #Testing normal distribution and independence assumptions
+  test1 <- jarqueberaTest(modelName$resid) #Test residuals for normality
+  #Null Hypothesis: Skewness and Kurtosis are equal to zero
+  test2 <- dwtest(modelName) #Test for independence of residuals
+  #Null Hypothesis: Errors are serially Uncorrelated
+  #Simple Regression Residual Plots
+  cat("Jarque - Bera Normality Test to check if residuals are normally distributed\nWe want a non-significant result so as not to reject the null hypothesis that skewness and kurtosis are equal to zero\n")
+  print(test1)
+  if (test1@test[["p.value"]] < 0.05){testN1 <- "The Jarque - Bera Normality Test is significant.\nThis suggests the data is NOT normally distributed, and violates\nthe assumptions of the regression\n\n"}
+  else {testN1 <- "The Jarque - Bera Normality Test is non-significant.\nThis suggests the data is normally distributed\n\n"}
+  if (test2[["p.value"]] < 0.05){testN2 <- "The Durbin-Watson Test is significant.\nThis suggests the residuals are NOT independent.\nIt is likely your data violates the assumptions of the regression test\n\n"}
+  else {testN2 <- "The Durbin-Watson Test is non-significant.\nThis suggests the independence of residuals\n\n"}
+  cat(testN1)
+  cat("Durbin-Watson Test to check for independence of residuals:\nWe want a non-significant result so as not to reject the null hypothesis:\nThe errors are serially uncorrelated\n")
+  print(test2)
+  cat(testN2)
+}
+
 
 ui <- shinyUI(fluidPage(
   tags$head(
@@ -53,6 +79,8 @@ ui <- shinyUI(fluidPage(
       line-height:2;
       margin-bottom: 6pt;
       }
+      
+      .btn.shiny-download-link { background: #FFFED3; }
       "
       
     )
@@ -61,8 +89,8 @@ ui <- shinyUI(fluidPage(
   titlePanel("Regression Analysis"),
   tabsetPanel(
     tabPanel(
-      "Upload File",
-      titlePanel("Uploading Files"),
+      "Upload Data",
+      titlePanel("Uploading Data"),
       sidebarLayout(
         sidebarPanel(
           fileInput(
@@ -160,6 +188,26 @@ ui <- shinyUI(fluidPage(
             tags$h3("Descriptive Statistics"),
             verbatimTextOutput("StatSum"),
             tags$br(),
+            tags$h3("Residual Standard Error"),
+            tags$p("The residual standard error (RSE) is a way to measure the standard deviation of the residuals in a regression model. Use this to help decide which regression model to report."),
+            tags$ul(tags$li("The lower the value for RSE, the more closely a model is able to fit the data."),
+            				tags$li("Compare the RSE for the robust regression model against the standard model. The lower of the two points to a better fit for that particular model."),
+            ),
+            tags$br(),
+            tags$div(HTML("<h3>Multiple R-squared and F-statistic</h3>
+
+* Multiple R-squared is the square of the simple correlation between the predictor and the outcome (measured) variable (the _intercept_).
+* Taking the square root gives us the Pearson Correlation Coefficient (R) between these two variables
+* This Multiple R-squared value also tells us that the _predictor_ accounts for _R-squared %_ of the variation in the outcome variable (the _intercept_) 
+* The F-statistic is the result of an ANOVA of the data. If it is statistically significant, it means that the regression model predicts outcomes of the _intercept_ based on the _predictor_ significantlly well
+
+### Coefficients
+
+* The _Estimate_ of the _Intercept_ is _b~0~_, or the Y intercept, and it is the value of the _intercept_ when the _predictor_ is 0
+* Below this, we have the value of _b~1~_. This represents the change in the _intercept_ with a 1 unit change in the _predictor_
+* The result of the t-test here (the _t-value_) tells us whether this _predictor_ has a statistically significant effect in predicting outcomes of the _intercept_")),
+            verbatimTextOutput("RegressRSET"),
+            verbatimTextOutput("RegressRSE"),
             tags$h3("Scatterplot"),
             plotOutput('MyPlot'),
             downloadButton(outputId = "downloadPlotRegP",
@@ -167,29 +215,28 @@ ui <- shinyUI(fluidPage(
             tags$h3("Regression Analysis"),
             verbatimTextOutput("ifbstp"),
             verbatimTextOutput("Regress"),
-            tags$h4("95% Confidence Intervals for the Intercept"),
+            tags$h4("95% Confidence Intervals for the Slope"),
             verbatimTextOutput("RegressCI"),
             tags$h4("95% Confidence Intervals for R Squared"),
             tags$p(tags$i("LCL is the lower CI, UCL the upper.")),
             verbatimTextOutput("CIrg"),
-            tags$br(),
-            tags$h3("Residual Standard Error"),
-            tags$p("The residual standard error (RSE) is a way to measure the standard deviation of the residuals in a regression model. Use this to help decide which regresion model to report."),
-            tags$ul(tags$li("The lower the value for RSE, the more closely a model is able to fit the data."),
-                    tags$li("Compare the RSE for the robust regression model against the standard model. The lower of the two points to a better fit for that particular model."),
-            ),
-            verbatimTextOutput("RegressRSET"),
-            verbatimTextOutput("RegressRSE"),
+            verbatimTextOutput("regAPAtab"),
           ),
+          
           tabPanel(
-            "Residuals",
-            tags$h3("Graph of Standardized Residuals"),
-            tags$p("Standardized residuals with an absolute value greater than 3 should be considered as outliers.",
-                   tags$br(),
-                   "These may result in inaccurate results if using a standard regression.",
-                   tags$br(),
-                   "If outliers are present, a robust regression will likely give better results."),
-            plotOutput('stdrPlot'),
+            "Checking the Accurancy of the Model",
+            tags$h3("Checking Assumptions"),
+            tags$div(
+            	HTML("<ul>
+            			 <li>Check the plot of <i>Residuals vs Fitted</i>. The points should be randomly spread out and evenly dispersed around zero. If you are seeing clear patterns in the data, it means there is some problem with your sample.</li>
+            			 <li>Look at the <i>Normal Q=Q Plot</i>. <b>Standardized residuals</b> with an absolute value greater than 3 should be considered as outliers, and may result in inaccurate results if carrying out a standard regression. Also check the that the data generally follows a smooth path along the dotted diagonal line. If the data curves away from this, the samole has problems with normality.</li>
+            			 <li>The plot of <i>Cook' Distance</i> shows influential cases which may have an undue effect on the analysis.</li>
+            			 <li>You'll need to look into possible solutions when the data doesn't meeet assumptions. At the very least, you won't be able to make any claims beyond your sample. You might need to consider using the robust solution.</li>
+            			 </ul>"),
+            				 ),
+            plotOutput("regResPlot"),
+            tags$p("The following tests can also provide more information about your data."),
+            verbatimTextOutput("residTest"),
           )
         )
         )
@@ -247,6 +294,9 @@ server <- shinyServer(function(input, output, session) {
   regressionData <- reactive(data.frame(x = x(),
                                         y = y()))
   
+  xname <- reactive(input$XVar)
+  
+  yname <- reactive(input$YVar)
   
   rg <- reactive(lm(y ~ x, regressionData(), na.action=na.exclude))
   
@@ -265,7 +315,7 @@ server <- shinyServer(function(input, output, session) {
   ## regression Plot
   
   p <- reactive(ggplot(regressionData()) +
-    aes(x = x, y = y) +
+    aes(x, y) +
     geom_point(size = 3, alpha = .8) +
     theme_minimal() +
     theme(
@@ -320,17 +370,13 @@ server <- shinyServer(function(input, output, session) {
     round(describe(x), digits = 3)
   })
   
-  #plot standardized residuals
-  
-  output$stdrPlot <- renderPlot({
-    
-    rg.stdres =  rstandard(rg())
-    plot(y(), rg.stdres, 
-         ylab="", 
-         xlab="", 
-         main="") 
-    abline(0, 0)})
-  
+  # Plot residuals 
+
+  output$regResPlot <- renderPlot({
+  	par(mfrow = c(2, 2)) # Set panel layout to 1 x 2
+  	plot(rg(), which = c(1,2,4))
+  	par(mfrow = c(1, 1)) # Change back
+  })  
   
   ifbstp <- reactive({
     
@@ -396,6 +442,8 @@ server <- shinyServer(function(input, output, session) {
   })  
   
   output$ifbstp <- renderPrint({ifbstp()})
+  output$residTest <- renderPrint({residTest(rg(), regressionData())})
+  output$residPlot <- renderPlot({residPlot(rg(), regressionData())})
   
 })
 
