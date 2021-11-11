@@ -194,28 +194,20 @@ ui <- shinyUI(fluidPage(
             				tags$li("Compare the RSE for the robust regression model against the standard model. The lower of the two points to a better fit for that particular model."),
             ),
             tags$br(),
-            tags$div(HTML("<h3>Multiple R-squared and F-statistic</h3>
-
-* Multiple R-squared is the square of the simple correlation between the predictor and the outcome (measured) variable (the _intercept_).
-* Taking the square root gives us the Pearson Correlation Coefficient (R) between these two variables
-* This Multiple R-squared value also tells us that the _predictor_ accounts for _R-squared %_ of the variation in the outcome variable (the _intercept_) 
-* The F-statistic is the result of an ANOVA of the data. If it is statistically significant, it means that the regression model predicts outcomes of the _intercept_ based on the _predictor_ significantlly well
-
-### Coefficients
-
-* The _Estimate_ of the _Intercept_ is _b~0~_, or the Y intercept, and it is the value of the _intercept_ when the _predictor_ is 0
-* Below this, we have the value of _b~1~_. This represents the change in the _intercept_ with a 1 unit change in the _predictor_
-* The result of the t-test here (the _t-value_) tells us whether this _predictor_ has a statistically significant effect in predicting outcomes of the _intercept_")),
             verbatimTextOutput("RegressRSET"),
             verbatimTextOutput("RegressRSE"),
             tags$h3("Scatterplot"),
             plotOutput('MyPlot'),
+            tags$p("The scatterplot shows the regression line. The band surrounding it is the confidence band / interval."),
             downloadButton(outputId = "downloadPlotRegP",
                            label = "Download This Plot"),
             tags$h3("Regression Analysis"),
             verbatimTextOutput("ifbstp"),
             verbatimTextOutput("Regress"),
-            tags$h4("95% Confidence Intervals for the Slope"),
+            tags$hr(),
+            tags$br(),
+            tags$h3("Confidence Intervals"),
+            tags$h4("95% Confidence Intervals for the Coefficients"),
             verbatimTextOutput("RegressCI"),
             tags$h4("95% Confidence Intervals for R Squared"),
             tags$p(tags$i("LCL is the lower CI, UCL the upper.")),
@@ -230,7 +222,7 @@ ui <- shinyUI(fluidPage(
             	HTML("<ul>
             			 <li>Check the plot of <i>Residuals vs Fitted</i>. The points should be randomly spread out and evenly dispersed around zero. If you are seeing clear patterns in the data, it means there is some problem with your sample.</li>
             			 <li>Look at the <i>Normal Q=Q Plot</i>. <b>Standardized residuals</b> with an absolute value greater than 3 should be considered as outliers, and may result in inaccurate results if carrying out a standard regression. Also check the that the data generally follows a smooth path along the dotted diagonal line. If the data curves away from this, the samole has problems with normality.</li>
-            			 <li>The plot of <i>Cook' Distance</i> shows influential cases which may have an undue effect on the analysis.</li>
+            			 <li>The plot of <i>Cook's Distance</i> shows influential cases which may have an undue effect on the analysis.</li>
             			 <li>You'll need to look into possible solutions when the data doesn't meeet assumptions. At the very least, you won't be able to make any claims beyond your sample. You might need to consider using the robust solution.</li>
             			 </ul>"),
             				 ),
@@ -317,21 +309,20 @@ server <- shinyServer(function(input, output, session) {
   p <- reactive(ggplot(regressionData()) +
     aes(x, y) +
     geom_point(size = 3, alpha = .8) +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_text(size = 14),
-      axis.text.y = element_text(size = 14),
-      axis.title = element_text(size = 16, lineheight = 2),
-      plot.title = element_text(
-        size = 16,
-        lineheight = 2,
-        face = "bold"
-      )
-    )  +
-    xlab(req(input$XVar)) +
-    ylab(req(input$YVar)) +
-    ggtitle(req(input$pTitle)) +
-    scale_linetype_discrete(guide = "none"))
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        axis.title = element_text(size = 16, lineheight = 2),
+        plot.title = element_text(
+          size = 16,
+          lineheight = 2,face = "bold"
+          )
+        )  +
+      xlab(req(input$XVar)) +
+      ylab(req(input$YVar)) +
+      ggtitle(req(input$pTitle)) +
+      scale_linetype_discrete(guide = "none"))
   
   #-------------
   
